@@ -1,13 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+type InputMode = 'camera' | 'upload'
 
 interface Props {
   title?: string
   onCapture?: (dataUrl: string) => void
 }
 
+function isProbablyMobile() {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(navigator.userAgent)
+}
+
 export default function CameraPanel({ title = 'Camera reference', onCapture }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const mobile = useMemo(() => isProbablyMobile(), [])
+  const supportsCamera = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia)
+  const [mode, setMode] = useState<InputMode>(supportsCamera && mobile ? 'camera' : 'upload')
   const [active, setActive] = useState(false)
   const [image, setImage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -17,6 +28,8 @@ export default function CameraPanel({ title = 'Camera reference', onCapture }: P
     streamRef.current = null
     setActive(false)
   }
+
+  const clearImage = () => setImage(null)
 
   const start = async () => {
     setError(null)
@@ -34,6 +47,7 @@ export default function CameraPanel({ title = 'Camera reference', onCapture }: P
         videoRef.current.srcObject = stream
         await videoRef.current.play()
       }
+      setMode('camera')
       setActive(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to open camera.')
@@ -57,6 +71,8 @@ export default function CameraPanel({ title = 'Camera reference', onCapture }: P
 
   const upload = (file?: File) => {
     if (!file) return
+    setError(null)
+    stop()
     const reader = new FileReader()
     reader.onload = () => {
       const data = String(reader.result)
@@ -66,7 +82,17 @@ export default function CameraPanel({ title = 'Camera reference', onCapture }: P
     reader.readAsDataURL(file)
   }
 
+  const switchMode = (nextMode: InputMode) => {
+    setMode(nextMode)
+    setError(null)
+    stop()
+  }
+
   useEffect(() => () => stop(), [])
+
+  const helperText = mobile
+    ? 'Mobile mode: use the live rear camera or pick an image from your phone gallery.'
+    : 'Desktop mode: upload a picture from your computer, or use a webcam if available.'
 
   return (
     <section className="camera-card panel">
@@ -78,6 +104,28 @@ export default function CameraPanel({ title = 'Camera reference', onCapture }: P
         <span className="privacy-pill">Local only</span>
       </div>
 
+      <div className="mode-toggle" role="tablist" aria-label="Input source">
+        <button
+          type="button"
+          className={`toggle-chip ${mode === 'camera' ? 'active' : ''}`}
+          onClick={() => switchMode('camera')}
+          disabled={!supportsCamera}
+          aria-pressed={mode === 'camera'}
+        >
+          📷 Camera
+        </button>
+        <button
+          type="button"
+          className={`toggle-chip ${mode === 'upload' ? 'active' : ''}`}
+          onClick={() => switchMode('upload')}
+          aria-pressed={mode === 'upload'}
+        >
+          🖼 Upload picture
+        </button>
+      </div>
+
+      <p className="muted small camera-helper">{helperText}</p>
+
       <div className="camera-stage">
         {image && !active ? (
           <img src={image} alt="Captured puzzle" />
@@ -86,9 +134,13 @@ export default function CameraPanel({ title = 'Camera reference', onCapture }: P
         )}
         {!active && !image && (
           <div className="camera-empty">
-            <span>📷</span>
-            <strong>Camera is off</strong>
-            <small>Start the camera or choose a photo.</small>
+            <span>{mode === 'camera' ? '📷' : '🖼'}</span>
+            <strong>{mode === 'camera' ? 'Camera is off' : 'No image selected'}</strong>
+            <small>
+              {mode === 'camera'
+                ? 'Open the camera on your phone or laptop.'
+                : 'Choose a puzzle photo from your device.'}
+            </small>
           </div>
         )}
         {(active || image) && <div className="scan-guide" aria-hidden="true" />}
@@ -97,19 +149,37 @@ export default function CameraPanel({ title = 'Camera reference', onCapture }: P
       {error && <p className="error-message">{error}</p>}
 
       <div className="button-row wrap">
-        {!active ? (
-          <button className="primary-button" onClick={start}>Open camera</button>
+        {mode === 'camera' ? (
+          <>
+            {!active ? (
+              <button className="primary-button" onClick={start} disabled={!supportsCamera}>Open camera</button>
+            ) : (
+              <button className="primary-button" onClick={capture}>Capture</button>
+            )}
+            {active && <button className="secondary-button" onClick={stop}>Stop</button>}
+          </>
         ) : (
-          <button className="primary-button" onClick={capture}>Capture</button>
+          <button className="primary-button" onClick={() => fileInputRef.current?.click()}>Choose picture</button>
         )}
-        {active && <button className="secondary-button" onClick={stop}>Stop</button>}
-        {image && !active && <button className="secondary-button" onClick={() => setImage(null)}>Retake</button>}
+
         <label className="secondary-button file-button">
-          Choose photo
-          <input type="file" accept="image/*" capture="environment" onChange={(e) => upload(e.target.files?.[0])} />
+          Upload image
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => upload(e.target.files?.[0])}
+          />
         </label>
+
+        {image && !active && <button className="secondary-button" onClick={clearImage}>Clear</button>}
       </div>
-      <p className="muted small">The v0.1 camera captures a clean reference image. Automatic OCR/board recognition is the next vision layer; the puzzle engines already live behind a shared module interface.</p>
+
+      {!supportsCamera && (
+        <p className="muted small">This browser does not expose camera access, so upload mode is the fallback.</p>
+      )}
+
+      <p className="muted small">PuzzleCam now supports both flows in one responsive page: live camera on mobile and upload-picture mode on desktop or mobile. Automatic OCR / board recognition remains the next vision layer behind this shared input module.</p>
     </section>
   )
 }

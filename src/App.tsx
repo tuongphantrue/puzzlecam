@@ -37,7 +37,7 @@ export default function App() {
       <AppHeader onHome={home} showBack={Boolean(selected)} />
       {PuzzleComponent ? <PuzzleComponent /> : <Home puzzles={puzzles} onOpen={open} />}
       <footer>
-        <span>PuzzleCam v0.2</span>
+        <span>PuzzleCam v0.3</span>
         <span>Camera frames stay in your browser in this MVP.</span>
       </footer>
     </div>

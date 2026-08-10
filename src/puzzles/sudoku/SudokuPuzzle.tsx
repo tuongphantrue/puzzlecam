@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react'
 import PuzzleShell from '../../components/PuzzleShell'
 import { recognizeSudoku, type SudokuScanProgress } from './recognizer'
 import { emptyGrid, hasConflicts, solveSudoku, type SudokuGrid } from './solver'
-import './rework-sudoku.css'
 
 const clone = (grid: SudokuGrid) => grid.map((row) => [...row])
 

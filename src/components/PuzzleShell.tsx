@@ -1,27 +1,26 @@
-import type { PropsWithChildren, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
-interface Props extends PropsWithChildren {
-  icon: string
+interface Props {
+  icon?: string
   title: string
-  subtitle: string
-  actions?: ReactNode
+  subtitle?: string
+  children: ReactNode
 }
 
-export default function PuzzleShell({ icon, title, subtitle, actions, children }: Props) {
+export default function PuzzleShell({ icon, title, subtitle, children }: Props) {
   return (
-    <main className="section puzzle-page">
-      <div className="puzzle-title-row">
-        <div className="title-with-icon">
-          <span className="large-icon">{icon}</span>
-          <div>
-            <p className="eyebrow">Puzzle module</p>
+    <div className="pc-puzzle-page">
+      <header className="pc-page-heading pc-puzzle-heading">
+        <div>
+          <p className="pc-kicker">Puzzle solver</p>
+          <div className="pc-title-line">
+            {icon && <span className="pc-title-icon" aria-hidden="true">{icon}</span>}
             <h1>{title}</h1>
-            <p className="muted">{subtitle}</p>
           </div>
+          {subtitle && <p>{subtitle}</p>}
         </div>
-        {actions}
-      </div>
-      {children}
-    </main>
+      </header>
+      <div className="pc-puzzle-content">{children}</div>
+    </div>
   )
 }

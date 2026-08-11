@@ -49,7 +49,6 @@ export default function SudokuPuzzle() {
     if (value) nextGivens.add(key)
     else nextGivens.delete(key)
     setGivens(nextGivens)
-
     setMessage('Board updated. Review the recognized digits, then solve when ready.')
   }
 
@@ -121,181 +120,114 @@ export default function SudokuPuzzle() {
   }
 
   const validationLabel = conflicts ? 'Needs review' : recognizedCount ? 'Valid' : 'Waiting'
-  const workflowStep = solved ? 4 : recognizedCount ? 3 : image ? 2 : 1
+  const issueCount = (conflicts ? 1 : 0) + (scanMeta?.warnings.length || 0)
 
   return (
     <PuzzleShell
       icon="▦"
-      title="Sudoku Solver"
-      subtitle="Upload or photograph a Sudoku puzzle, review recognized digits, then solve."
+      title="Sudoku"
+      subtitle="Scan or upload a Sudoku, review OCR, then solve."
     >
       <div className="rw-sudoku-page">
-        <div className="rw-page-toolbar">
-          <div className="rw-breadcrumb">Puzzles <span>/</span> Sudoku Solver</div>
-          <span className={`rw-status-chip ${scanning ? 'busy' : ''}`}>
-            <i /> {scanning ? 'OCR running' : 'OCR ready'}
-          </span>
+        <div className="rw-commandbar">
+          <div className="rw-view-tabs" aria-label="Sudoku workflow">
+            <span className={image ? 'done' : 'active'}>Input</span>
+            <span className={recognizedCount && !solved ? 'active' : recognizedCount ? 'done' : ''}>Review</span>
+            <span className={solved ? 'active' : ''}>Solution</span>
+          </div>
+          <div className="rw-command-actions">
+            <button className="rw-button secondary" onClick={() => photoInputRef.current?.click()} disabled={scanning}>⌑ Take photo</button>
+            <button className="rw-button secondary" onClick={() => uploadInputRef.current?.click()} disabled={scanning}>⇧ Upload image</button>
+            <input ref={photoInputRef} className="rw-hidden-input" type="file" accept="image/*" capture="environment" onChange={(event) => loadFile(event.target.files?.[0])} />
+            <input ref={uploadInputRef} className="rw-hidden-input" type="file" accept="image/*" onChange={(event) => loadFile(event.target.files?.[0])} />
+          </div>
         </div>
 
-        <div className="rw-workspace-grid">
-          <section className="rw-card rw-input-card">
-            <div className="rw-card-title">1. Input</div>
-            <button className="rw-input-action" onClick={() => photoInputRef.current?.click()} disabled={scanning}>
-              <span className="rw-icon">⌑</span>
-              Take Photo
-            </button>
-            <button className="rw-input-action" onClick={() => uploadInputRef.current?.click()} disabled={scanning}>
-              <span className="rw-icon">⇧</span>
-              Upload Image
-            </button>
-            <input
-              ref={photoInputRef}
-              className="rw-hidden-input"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(event) => loadFile(event.target.files?.[0])}
-            />
-            <input
-              ref={uploadInputRef}
-              className="rw-hidden-input"
-              type="file"
-              accept="image/*"
-              onChange={(event) => loadFile(event.target.files?.[0])}
-            />
-            <p className="rw-helper">JPG, PNG, HEIC and other browser-supported images.</p>
-          </section>
+        <div className="rw-statusline" aria-live="polite">
+          <span><em className={image ? 'ok' : ''} />Input <strong>{image ? 'Image selected' : 'Waiting'}</strong></span>
+          <span><em className={recognizedCount ? 'ok' : scanning ? 'busy' : ''} />OCR <strong>{scanning ? 'Running' : recognizedCount ? `${recognizedCount} cells` : 'Pending'}</strong></span>
+          <span><em className={recognizedCount && !conflicts ? 'ok' : conflicts ? 'danger' : ''} />Validation <strong>{validationLabel}</strong></span>
+          <span><em className={solved ? 'ok' : ''} />Solve <strong>{solved ? 'Ready' : 'Pending'}</strong></span>
+        </div>
 
-          <section className="rw-card rw-image-card">
-            <div className="rw-card-title">2. Captured Image</div>
-            <div className={`rw-image-stage ${image ? 'has-image' : ''}`}>
-              {image ? (
-                <img src={image} alt="Captured Sudoku" />
-              ) : (
-                <div className="rw-empty-state">
-                  <span className="rw-empty-icon">▧</span>
-                  <strong>No image selected</strong>
-                  <small>Take a photo or upload a clear picture of the full Sudoku grid.</small>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="rw-card rw-summary-card">
-            <div className="rw-card-title">3. OCR Summary</div>
-            <div className="rw-summary-row"><span>Recognized cells</span><strong>{scanMeta ? `${scanMeta.detectedCells} / 81` : '—'}</strong></div>
-            <div className="rw-summary-row"><span>Confidence (avg.)</span><strong>{scanMeta ? `${Math.round(scanMeta.confidence)}%` : '—'}</strong></div>
-            <div className="rw-summary-row"><span>Warnings</span><strong>{scanMeta ? scanMeta.warnings.length : '—'}</strong></div>
-            <div className="rw-summary-row">
-              <span>Validation</span>
-              <strong className={conflicts ? 'rw-text-danger' : recognizedCount ? 'rw-text-success' : ''}>{validationLabel}</strong>
-            </div>
-            <div className="rw-summary-row"><span>Status</span><strong>{scanning ? 'Processing' : solved ? 'Solved' : recognizedCount ? 'Ready to review' : 'Waiting'}</strong></div>
-          </section>
-
-          <aside className="rw-card rw-workflow-card">
-            <div className="rw-card-title">Workflow Overview</div>
-            {[
-              ['Input', image ? 'Image selected' : 'Waiting for image'],
-              ['OCR', recognizedCount ? `${recognizedCount} cells recognized` : scanning ? 'Processing image' : 'Pending'],
-              ['Validation', recognizedCount ? validationLabel : 'Pending'],
-              ['Solve', solved ? 'Solution ready' : 'Pending'],
-            ].map(([label, detail], index) => {
-              const number = index + 1
-              const complete = workflowStep > number || (number === 4 && solved)
-              const active = workflowStep === number && !complete
-              return (
-                <div className={`rw-step ${complete ? 'complete' : ''} ${active ? 'active' : ''}`} key={label}>
-                  <span className="rw-step-number">{number}</span>
-                  <div><strong>{label}</strong><small>{detail}</small></div>
-                  <span className="rw-step-state">{complete ? '✓' : active ? '○' : ''}</span>
-                </div>
-              )
-            })}
-
-            <div className="rw-side-section">
-              <div className="rw-side-heading">OCR Status</div>
-              <div className="rw-side-row"><span><i className="rw-dot" />Engine</span><strong>{scanning ? 'Running' : 'Ready'}</strong></div>
-              <div className="rw-side-row"><span><i className="rw-dot" />Language</span><strong>Numeric</strong></div>
-              <div className="rw-side-row"><span><i className="rw-dot" />Processing</span><strong>Local</strong></div>
-            </div>
-
-            <div className="rw-tip-box">
-              <strong>ⓘ Tips</strong>
-              <p>Keep the entire grid visible, well-lit and as straight as possible. Review OCR before solving.</p>
-            </div>
-          </aside>
-
-          <section className="rw-card rw-board-card">
-            <div className="rw-board-heading">
+        <div className="rw-main-grid">
+          <section className="rw-board-surface">
+            <div className="rw-section-heading">
               <div>
-                <div className="rw-card-title">4. Review Recognized Digits</div>
-                <p>Edit any incorrect OCR digits before solving. Empty cells stay blank.</p>
+                <strong>{solved ? 'Solved board' : 'Review recognized digits'}</strong>
+                <small>{solved ? 'Recognized givens remain emphasized.' : 'Edit any incorrect OCR digit before solving.'}</small>
               </div>
-              {recognizedCount > 0 && <span className="rw-mini-badge">{recognizedCount} givens</span>}
+              <span>{recognizedCount ? `${recognizedCount} givens` : 'Empty board'}</span>
             </div>
 
             {scanning && (
-              <div className="rw-scan-progress" aria-live="polite">
+              <div className="rw-scan-progress">
                 <div><strong>{progress?.message || 'Preparing scanner…'}</strong><span>{progressPercent !== null ? `${progressPercent}%` : ''}</span></div>
                 <div className="rw-progress-track"><span style={{ width: `${progressPercent ?? 12}%` }} /></div>
               </div>
             )}
 
-            <div className="rw-sudoku-grid" role="grid" aria-label="Sudoku grid">
-              {grid.map((row, r) => row.map((value, c) => {
-                const key = `${r}-${c}`
-                const isGiven = givens.has(key)
-                return (
-                  <input
-                    key={key}
-                    aria-label={`Row ${r + 1}, column ${c + 1}`}
-                    inputMode="numeric"
-                    value={value || ''}
-                    disabled={scanning || (solved && !isGiven)}
-                    onChange={(event) => change(r, c, event.target.value)}
-                    className={`${isGiven ? 'given' : ''} ${solved && !isGiven && value ? 'solution' : ''}`}
-                  />
-                )
-              }))}
+            <div className="rw-grid-wrap">
+              <div className="rw-sudoku-grid" role="grid" aria-label="Sudoku grid">
+                {grid.map((row, r) => row.map((value, c) => {
+                  const key = `${r}-${c}`
+                  const isGiven = givens.has(key)
+                  return (
+                    <input
+                      key={key}
+                      aria-label={`Row ${r + 1}, column ${c + 1}`}
+                      inputMode="numeric"
+                      value={value || ''}
+                      disabled={scanning || (solved && !isGiven)}
+                      onChange={(event) => change(r, c, event.target.value)}
+                      className={`${isGiven ? 'given' : ''} ${solved && !isGiven && value ? 'solution' : ''}`}
+                    />
+                  )
+                }))}
+              </div>
             </div>
 
-            <p className={`rw-solver-message ${conflicts ? 'error' : ''}`}>{message}</p>
+            <div className={`rw-message-row ${conflicts ? 'error' : solved ? 'success' : ''}`}>
+              <span>{conflicts ? '!' : solved ? '✓' : 'i'}</span><p>{message}</p>
+            </div>
 
-            <div className="rw-action-bar">
-              <div className="rw-action-left">
+            <div className="rw-actionbar">
+              <div>
                 <button className="rw-button secondary" onClick={() => image && void scanImage(image)} disabled={!image || scanning}>↻ Run OCR</button>
-                <button className="rw-button secondary" onClick={clear} disabled={scanning}>⌫ Clear</button>
+                <button className="rw-button ghost" onClick={clear} disabled={scanning}>Clear</button>
               </div>
-              <button className="rw-button primary" onClick={solve} disabled={scanning || !recognizedCount || conflicts}>▦ Solve Sudoku</button>
+              <button className="rw-button primary" onClick={solve} disabled={scanning || !recognizedCount || conflicts}>Solve Sudoku</button>
             </div>
           </section>
 
-          <section className="rw-card rw-review-card">
-            <div className="rw-card-title">5. Solution / Review</div>
-            <div className={`rw-review-state ${solved ? 'solved' : ''}`}>
-              <span>{solved ? '✓' : '◇'}</span>
-              <strong>{solved ? 'Solution ready' : 'Review recognized cells before solving.'}</strong>
-              <p>{solved ? 'Original recognized givens remain emphasized; computed solution cells are lighter.' : 'Once the OCR digits look correct, click Solve Sudoku to generate the solution.'}</p>
-            </div>
+          <aside className="rw-inspector">
+            <section className="rw-inspector-section">
+              <div className="rw-inspector-title"><strong>Source image</strong><span>{image ? 'Loaded' : 'No image'}</span></div>
+              <div className={`rw-image-stage ${image ? 'has-image' : ''}`}>
+                {image ? <img src={image} alt="Captured Sudoku" /> : <div className="rw-empty-state"><span>▧</span><strong>No image selected</strong><small>Use Take photo or Upload image above.</small></div>}
+              </div>
+            </section>
 
-            <div className="rw-issues-heading">Detected Issues</div>
-            {conflicts && (
-              <div className="rw-issue danger">
-                <span className="rw-issue-dot" />
-                <div><strong>Conflicting values</strong><small>Correct the board before solving.</small></div>
-              </div>
-            )}
-            {scanMeta?.warnings.map((warning) => (
-              <div className="rw-issue" key={warning}>
-                <span className="rw-issue-dot" />
-                <div><strong>OCR warning</strong><small>{warning}</small></div>
-              </div>
-            ))}
-            {!conflicts && !scanMeta?.warnings.length && (
-              <div className="rw-no-issues">{recognizedCount ? 'No validation issues detected.' : 'Issues will appear here after OCR.'}</div>
-            )}
-          </section>
+            <section className="rw-inspector-section">
+              <div className="rw-inspector-title"><strong>Recognition</strong><span>{scanning ? 'Processing' : 'Local'}</span></div>
+              <div className="rw-detail-row"><span>Recognized cells</span><strong>{scanMeta ? `${scanMeta.detectedCells} / 81` : '—'}</strong></div>
+              <div className="rw-detail-row"><span>Confidence</span><strong>{scanMeta ? `${Math.round(scanMeta.confidence)}%` : '—'}</strong></div>
+              <div className="rw-detail-row"><span>Validation</span><strong className={conflicts ? 'danger' : recognizedCount ? 'ok' : ''}>{validationLabel}</strong></div>
+              <div className="rw-detail-row"><span>Issues</span><strong>{scanMeta || conflicts ? issueCount : '—'}</strong></div>
+            </section>
+
+            <section className="rw-inspector-section">
+              <div className="rw-inspector-title"><strong>Review</strong><span>{issueCount ? `${issueCount} issue${issueCount === 1 ? '' : 's'}` : 'Clear'}</span></div>
+              {conflicts && <div className="rw-issue-row danger"><i /><div><strong>Conflicting values</strong><small>Correct the board before solving.</small></div></div>}
+              {scanMeta?.warnings.map((warning) => <div className="rw-issue-row" key={warning}><i /><div><strong>OCR warning</strong><small>{warning}</small></div></div>)}
+              {!conflicts && !scanMeta?.warnings.length && <p className="rw-inspector-note">{recognizedCount ? 'No validation issues detected.' : 'OCR warnings and validation issues will appear here.'}</p>}
+            </section>
+
+            <section className="rw-inspector-section rw-tip-section">
+              <strong>Capture tip</strong>
+              <p>Keep the entire grid visible, well-lit and as straight as possible. Always review OCR before solving.</p>
+            </section>
+          </aside>
         </div>
       </div>
     </PuzzleShell>

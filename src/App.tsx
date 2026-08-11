@@ -22,8 +22,11 @@ type NavItem = {
   status?: 'ready' | 'planned'
 }
 
-const primaryNav: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: '⌂', status: 'ready' },
+const workspaceNav: NavItem[] = [
+  { id: 'dashboard', label: 'My puzzles', icon: '⌂', status: 'ready' },
+]
+
+const solverNav: NavItem[] = [
   { id: 'sudoku', label: 'Sudoku', icon: '▦', status: 'ready' },
   { id: 'wordsearch', label: 'Word Search', icon: '⠿', status: 'ready' },
   { id: 'tictactoe', label: 'Tic-Tac-Toe', icon: '⌗', status: 'ready' },
@@ -38,127 +41,100 @@ const plannedNav: NavItem[] = [
   { id: 'math', label: 'Math', icon: '∑', status: 'planned' },
 ]
 
+const allNav = [...workspaceNav, ...solverNav, ...plannedNav]
+
 const pageMeta: Record<PageId, { title: string; section: string }> = {
-  dashboard: { title: 'Dashboard', section: 'Workspace' },
-  sudoku: { title: 'Sudoku Solver', section: 'Puzzles' },
-  wordsearch: { title: 'Word Search', section: 'Puzzles' },
-  tictactoe: { title: 'Tic-Tac-Toe', section: 'Puzzles' },
-  chess: { title: 'Chess', section: 'Coming soon' },
-  rubik: { title: "Rubik's Cube", section: 'Coming soon' },
-  checkers: { title: 'Checkers', section: 'Coming soon' },
-  connectfour: { title: 'Connect Four', section: 'Coming soon' },
-  nonogram: { title: 'Nonogram', section: 'Coming soon' },
-  math: { title: 'Math Solver', section: 'Coming soon' },
+  dashboard: { title: 'My puzzles', section: 'Workspace' },
+  sudoku: { title: 'Sudoku', section: 'Solvers' },
+  wordsearch: { title: 'Word Search', section: 'Solvers' },
+  tictactoe: { title: 'Tic-Tac-Toe', section: 'Solvers' },
+  chess: { title: 'Chess', section: 'More solvers' },
+  rubik: { title: "Rubik's Cube", section: 'More solvers' },
+  checkers: { title: 'Checkers', section: 'More solvers' },
+  connectfour: { title: 'Connect Four', section: 'More solvers' },
+  nonogram: { title: 'Nonogram', section: 'More solvers' },
+  math: { title: 'Math', section: 'More solvers' },
 }
 
 function pageFromHash(): PageId {
   if (typeof window === 'undefined') return 'dashboard'
   const raw = window.location.hash.replace(/^#\/?/, '').toLowerCase()
-  const known = [...primaryNav, ...plannedNav].some((item) => item.id === raw)
-  return known ? (raw as PageId) : 'dashboard'
+  return allNav.some((item) => item.id === raw) ? (raw as PageId) : 'dashboard'
 }
 
 function Icon({ name }: { name: string }) {
   return <span className="pc-nav-icon" aria-hidden="true">{name}</span>
 }
 
-function Dashboard({ navigate }: { navigate: (id: PageId) => void }) {
-  const quick = primaryNav.filter((item) => item.id !== 'dashboard')
+function SolverRow({ item, navigate }: { item: NavItem; navigate: (id: PageId) => void }) {
+  const details: Record<string, { input: string; engine: string }> = {
+    sudoku: { input: 'Photo / image', engine: 'OCR + solver' },
+    wordsearch: { input: 'Grid / words', engine: '8-direction finder' },
+    tictactoe: { input: 'Board state', engine: 'Minimax' },
+  }
+  const detail = details[item.id]
 
+  return (
+    <button className="pc-table-row pc-table-row-action" onClick={() => navigate(item.id)}>
+      <span className="pc-solver-name"><Icon name={item.icon} /><strong>{item.label}</strong></span>
+      <span>{detail?.input}</span>
+      <span>{detail?.engine}</span>
+      <span><em className="pc-status-dot" />Ready</span>
+      <span className="pc-table-open">Open →</span>
+    </button>
+  )
+}
+
+function Dashboard({ navigate }: { navigate: (id: PageId) => void }) {
   return (
     <div className="pc-dashboard">
       <header className="pc-page-heading">
         <div>
-          <p className="pc-kicker">PuzzleCam workspace</p>
-          <h1>Dashboard</h1>
-          <p>Scan, review and solve puzzles from one clean workspace.</p>
+          <h1>My puzzles</h1>
+          <p>Open a solver and work from one consistent puzzle workspace.</p>
         </div>
-        <div className="pc-heading-actions">
-          <span className="pc-status-pill"><i /> Local processing</span>
-        </div>
+        <button className="pc-button pc-button-primary" onClick={() => navigate('sudoku')}>Open Sudoku solver</button>
       </header>
 
-      <section className="pc-metric-grid" aria-label="Workspace summary">
-        <article className="pc-metric-card">
-          <span>Available solvers</span>
-          <strong>3</strong>
-          <small>Sudoku, Word Search, Tic-Tac-Toe</small>
-        </article>
-        <article className="pc-metric-card">
-          <span>Vision workflow</span>
-          <strong>Local</strong>
-          <small>Camera and image processing stay in-browser</small>
-        </article>
-        <article className="pc-metric-card">
-          <span>Sudoku OCR</span>
-          <strong>Ready</strong>
-          <small>Upload → review → solve</small>
-        </article>
-      </section>
+      <div className="pc-page-toolbar" aria-label="Puzzle views">
+        <div className="pc-view-tabs">
+          <span className="pc-view-tab active">Solvers</span>
+          <span className="pc-view-tab">Recent</span>
+        </div>
+        <span className="pc-inline-status"><i /> Local processing ready</span>
+      </div>
 
-      <div className="pc-dashboard-grid">
-        <section className="pc-card pc-dashboard-main">
-          <div className="pc-card-header">
-            <div>
-              <p className="pc-kicker">Quick start</p>
-              <h2>Ready solvers</h2>
-            </div>
-            <span className="pc-subtle-label">3 modules</span>
+      <div className="pc-home-grid">
+        <section className="pc-work-surface">
+          <div className="pc-section-header">
+            <div><strong>Solver workspace</strong><small>Available tools</small></div>
+            <span>3 ready</span>
           </div>
-
-          <div className="pc-module-list">
-            {quick.map((item) => (
-              <button key={item.id} className="pc-module-row" onClick={() => navigate(item.id)}>
-                <Icon name={item.icon} />
-                <span className="pc-module-copy">
-                  <strong>{item.label}</strong>
-                  <small>
-                    {item.id === 'sudoku' && 'Scan or upload a Sudoku, verify OCR digits, then solve.'}
-                    {item.id === 'wordsearch' && 'Enter or review a letter grid and find target words.'}
-                    {item.id === 'tictactoe' && 'Set a board position and calculate the best move.'}
-                  </small>
-                </span>
-                <span className="pc-row-status ready">Ready</span>
-                <span className="pc-row-arrow">→</span>
-              </button>
-            ))}
+          <div className="pc-data-table">
+            <div className="pc-table-head"><span>Solver</span><span>Input</span><span>Engine</span><span>Status</span><span /></div>
+            {solverNav.map((item) => <SolverRow key={item.id} item={item} navigate={navigate} />)}
           </div>
         </section>
 
-        <aside className="pc-card pc-dashboard-side">
-          <div className="pc-card-header compact">
-            <div>
-              <p className="pc-kicker">Workflow</p>
-              <h2>How PuzzleCam works</h2>
+        <aside className="pc-inspector-surface">
+          <div className="pc-inspector-heading">Workspace</div>
+          <div className="pc-inspector-row"><span>Processing</span><strong>On device</strong></div>
+          <div className="pc-inspector-row"><span>Ready solvers</span><strong>3</strong></div>
+          <div className="pc-inspector-row"><span>Camera input</span><strong>Available</strong></div>
+          <div className="pc-inspector-section">
+            <strong>Start here</strong>
+            <p>Choose a solver from the table. Sudoku accepts a photo or uploaded image and lets you review OCR before solving.</p>
+          </div>
+          <div className="pc-inspector-section">
+            <strong>More solvers</strong>
+            <div className="pc-mini-list">
+              {plannedNav.slice(0, 4).map((item) => (
+                <button key={item.id} onClick={() => navigate(item.id)}><span>{item.label}</span><em>Planned</em></button>
+              ))}
             </div>
           </div>
-          <ol className="pc-workflow-list">
-            <li><span>1</span><div><strong>Capture</strong><small>Take a photo or upload an image.</small></div></li>
-            <li><span>2</span><div><strong>Recognize</strong><small>Convert the picture into puzzle state.</small></div></li>
-            <li><span>3</span><div><strong>Review</strong><small>Correct uncertain recognition before solving.</small></div></li>
-            <li><span>4</span><div><strong>Solve</strong><small>Run the appropriate local solver.</small></div></li>
-          </ol>
         </aside>
       </div>
-
-      <section className="pc-card pc-coming-card">
-        <div className="pc-card-header">
-          <div>
-            <p className="pc-kicker">Roadmap</p>
-            <h2>More puzzle engines</h2>
-          </div>
-          <span className="pc-subtle-label">Planned</span>
-        </div>
-        <div className="pc-coming-grid">
-          {plannedNav.map((item) => (
-            <button className="pc-coming-item" key={item.id} onClick={() => navigate(item.id)}>
-              <Icon name={item.icon} />
-              <span><strong>{item.label}</strong><small>Planned module</small></span>
-              <span>→</span>
-            </button>
-          ))}
-        </div>
-      </section>
     </div>
   )
 }
@@ -167,25 +143,13 @@ function ComingSoon({ item }: { item: NavItem }) {
   return (
     <div className="pc-placeholder-page">
       <header className="pc-page-heading">
-        <div>
-          <p className="pc-kicker">Puzzle module</p>
-          <h1>{item.label}</h1>
-          <p>This engine is reserved in the shared PuzzleCam workspace.</p>
-        </div>
-        <span className="pc-status-pill muted"><i /> Planned</span>
+        <div><h1>{item.label}</h1><p>This solver will use the same PuzzleCam workspace convention.</p></div>
+        <span className="pc-inline-status muted">Planned</span>
       </header>
-
-      <section className="pc-card pc-empty-module">
-        <div className="pc-empty-glyph"><Icon name={item.icon} /></div>
-        <div>
-          <h2>{item.label} is coming next</h2>
-          <p>The page already uses the same app shell, spacing, panels, controls and status language as the ready solvers.</p>
-        </div>
-        <div className="pc-empty-meta">
-          <div><span>Status</span><strong>Planned</strong></div>
-          <div><span>Input</span><strong>Camera / image</strong></div>
-          <div><span>Processing</span><strong>Local-first</strong></div>
-        </div>
+      <div className="pc-page-toolbar"><div className="pc-view-tabs"><span className="pc-view-tab active">Overview</span></div></div>
+      <section className="pc-work-surface pc-placeholder-surface">
+        <Icon name={item.icon} />
+        <div><strong>{item.label} is planned</strong><p>Its input, analysis and result views will live inside the same compact app shell instead of a separate marketing-style page.</p></div>
       </section>
     </div>
   )
@@ -194,6 +158,10 @@ function ComingSoon({ item }: { item: NavItem }) {
 export default function App() {
   const [page, setPage] = useState<PageId>(() => pageFromHash())
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('puzzlecam-sidebar-collapsed') === '1'
+  })
 
   useEffect(() => {
     const sync = () => setPage(pageFromHash())
@@ -201,18 +169,19 @@ export default function App() {
     return () => window.removeEventListener('hashchange', sync)
   }, [])
 
+  useEffect(() => {
+    window.localStorage.setItem('puzzlecam-sidebar-collapsed', sidebarCollapsed ? '1' : '0')
+  }, [sidebarCollapsed])
+
   const navigate = (id: PageId) => {
     setMobileNavOpen(false)
-    if (id === 'dashboard') window.location.hash = '#/dashboard'
-    else window.location.hash = `#/${id}`
+    window.location.hash = `#/${id}`
     setPage(id)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const activeItem = useMemo(
-    () => [...primaryNav, ...plannedNav].find((item) => item.id === page),
-    [page],
-  )
+  const activeItem = useMemo(() => allNav.find((item) => item.id === page), [page])
+  const meta = pageMeta[page]
 
   const renderPage = () => {
     if (page === 'dashboard') return <Dashboard navigate={navigate} />
@@ -222,68 +191,59 @@ export default function App() {
     return <ComingSoon item={activeItem || plannedNav[0]} />
   }
 
-  const meta = pageMeta[page]
+  const navGroup = (label: string, items: NavItem[]) => (
+    <>
+      <p className="pc-nav-label">{label}</p>
+      {items.map((item) => (
+        <button key={item.id} title={sidebarCollapsed ? item.label : undefined} className={`pc-nav-item ${page === item.id ? 'active' : ''}`} onClick={() => navigate(item.id)}>
+          <Icon name={item.icon} />
+          <span>{item.label}</span>
+          {item.status === 'ready' && item.id !== 'dashboard' && <i className="pc-ready-dot" title="Ready" />}
+        </button>
+      ))}
+    </>
+  )
 
   return (
     <div className="pc-app-shell">
-      <aside className={`pc-sidebar ${mobileNavOpen ? 'open' : ''}`}>
-        <div className="pc-brand" role="button" tabIndex={0} onClick={() => navigate('dashboard')}>
-          <span className="pc-brand-mark">▣</span>
-          <div><strong>PuzzleCam</strong><small>Point. Think. Solve.</small></div>
+      <aside className={`pc-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileNavOpen ? 'open' : ''}`}>
+        <div className="pc-sidebar-head">
+          <button className="pc-brand" onClick={() => navigate('dashboard')} title={sidebarCollapsed ? 'PuzzleCam — My puzzles' : undefined}>
+            <span className="pc-brand-mark"><img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" /></span>
+            <span className="pc-brand-copy"><strong>PuzzleCam</strong><small>Puzzle workspace</small></span>
+          </button>
+          <button
+            type="button"
+            className="pc-sidebar-collapse"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setSidebarCollapsed((value) => !value)}
+          >
+            {sidebarCollapsed ? '›' : '‹'}
+          </button>
         </div>
-
         <nav className="pc-nav" aria-label="Primary navigation">
-          <p className="pc-nav-label">Workspace</p>
-          {primaryNav.map((item) => (
-            <button
-              key={item.id}
-              className={`pc-nav-item ${page === item.id ? 'active' : ''}`}
-              onClick={() => navigate(item.id)}
-            >
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
-              {item.id !== 'dashboard' && <i className="pc-ready-dot" title="Ready" />}
-            </button>
-          ))}
-
+          {navGroup('Workspace', workspaceNav)}
+          {navGroup('Solvers', solverNav)}
           <div className="pc-nav-divider" />
-          <p className="pc-nav-label">More solvers</p>
-          {plannedNav.map((item) => (
-            <button
-              key={item.id}
-              className={`pc-nav-item ${page === item.id ? 'active' : ''}`}
-              onClick={() => navigate(item.id)}
-            >
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {navGroup('More solvers', plannedNav)}
         </nav>
-
-        <div className="pc-sidebar-footer">
-          <div><strong>PuzzleCam</strong><small>Local-first puzzle tools</small></div>
-          <span>v0.3</span>
-        </div>
+        <div className="pc-sidebar-footer"><span><i /> <b>Local processing</b></span><small>v0.3</small></div>
       </aside>
 
       {mobileNavOpen && <button className="pc-nav-scrim" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
 
-      <div className="pc-app-main">
+      <div className={`pc-app-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <header className="pc-topbar">
           <div className="pc-topbar-left">
             <button className="pc-mobile-menu" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}>☰</button>
-            <div className="pc-breadcrumbs">
-              <span>{meta.section}</span>
-              <b>/</b>
-              <strong>{meta.title}</strong>
-            </div>
+            <div className="pc-breadcrumbs"><span>{meta.section}</span><b>/</b><strong>{meta.title}</strong></div>
           </div>
           <div className="pc-topbar-actions">
-            <span className="pc-system-status"><i /> App ready</span>
-            <button type="button" className="pc-topbar-button" title="PuzzleCam processes supported workflows locally">?</button>
+            <span className="pc-system-status"><i /> Ready</span>
+            <button type="button" className="pc-topbar-button" title="PuzzleCam help">?</button>
           </div>
         </header>
-
         <main className="pc-content">{renderPage()}</main>
       </div>
     </div>

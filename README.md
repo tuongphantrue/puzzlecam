@@ -1,32 +1,65 @@
-# PuzzleCam — Rework-style all-pages UI update
+# PuzzleCam — Rework-style all-pages UI + favicon update
 
 This package is an **overlay for the existing `tuongphantrue/puzzlecam` repository**.
 
 ## What it changes
 
-- Replaces the old dark marketing-style home screen with a light, dense enterprise app dashboard.
-- Adds one consistent app shell across every page: left navigation, top bar, breadcrumbs, status language, compact panels and responsive mobile navigation.
-- Restyles the ready modules: Sudoku, Word Search and Tic-Tac-Toe.
-- Restyles shared camera/upload input so puzzle pages use the same UI language.
-- Gives planned modules their own consistent in-app placeholder pages instead of marketing cards.
-- Keeps Sudoku **solver-only**: photo/upload → OCR → review recognized digits → solve. No generated sample, Hint, difficulty or New Game flow.
+- Replaces the old dark marketing-style home screen with a light, dense Rework-style app workspace.
+- Uses one consistent shell across Dashboard/My puzzles, Sudoku, Word Search, Tic-Tac-Toe and planned solvers.
+- Keeps Sudoku **solver-only**: photo/upload → OCR → review recognized digits → solve.
+- Replaces the old colorful camera favicon/app icon with a compact monochrome **camera + puzzle-grid** mark that matches the new UI.
+- Uses that same mark in the PuzzleCam sidebar brand so the browser icon and in-app identity are consistent.
 
 ## Files to replace/add
 
-Copy the `src/` folder from this ZIP over the `src/` folder in the repository:
+Copy the contents of this package over the repository, preserving folders.
 
-- `src/App.tsx` — new global app shell + dashboard + module navigation
-- `src/components/PuzzleShell.tsx` — shared page heading/container
-- `src/components/CameraPanel.tsx` — same camera/upload behavior with the new UI
-- `src/puzzles/sudoku/SudokuPuzzle.tsx` — solver-only Sudoku flow
-- `src/styles.css` — compatibility entry point
-- `src/css/rework.css` — global Rework-style app UI
-- `src/css/sudoku.css` — Sudoku workflow styles
+### UI
+- `src/App.tsx`
+- `src/components/PuzzleShell.tsx`
+- `src/components/CameraPanel.tsx`
+- `src/puzzles/sudoku/SudokuPuzzle.tsx`
+- `src/styles.css`
+- `src/css/rework.css`
+- `src/css/sudoku.css`
 
-No solver/recognizer files are replaced, so the existing puzzle engines stay in place.
+### Favicon / PWA icon assets
+- `public/favicon.svg`
+- `public/favicon.ico`
+- `public/favicon-16x16.png`
+- `public/favicon-32x32.png`
+- `public/apple-touch-icon.png`
+- `public/safari-pinned-tab.svg`
+- `public/pwa-192x192.png`
+- `public/pwa-512x512.png`
+- `public/maskable-512x512.png`
 
-## Deploy
+The common Vite/VitePWA filenames are included so existing favicon/PWA references can be replaced without changing solver code.
 
-After copying the files, commit and push to `main`. The repository's existing GitHub Pages workflow can build/deploy the updated UI.
+## If your `index.html` explicitly names an older favicon
 
-If GitHub Pages still shows the old design immediately after deployment, hard refresh the page (Ctrl+Shift+R) or clear the installed PWA/service-worker cache, because PuzzleCam is an installable PWA and an older app shell may remain cached.
+Point its favicon links at the new public asset, preferably:
+
+```html
+<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+```
+
+For GitHub Pages, keeping these references relative avoids pointing at the domain root instead of `/puzzlecam/`.
+
+## Deploy / cache
+
+After copying the files, commit and push to `main`. The repository's GitHub Pages workflow can rebuild the app.
+
+Favicons and PWA icons are aggressively cached by browsers and service workers. After deployment, if the old icon remains, use a hard refresh and clear the PuzzleCam site/PWA cache once.
+
+## Sidebar collapse update
+
+The Rework-style navigation can now be collapsed on desktop using the small chevron on the sidebar edge.
+
+- Expanded width: 216 px
+- Collapsed width: 58 px, icon-only navigation
+- The collapsed preference is saved in `localStorage`
+- Navigation items expose titles/tooltips in collapsed mode
+- On screens 760 px and below, the sidebar uses the existing full-width mobile drawer instead of the desktop collapsed state

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import PuzzleShell from '../../components/PuzzleShell'
-import { recognizeSudoku, type SudokuScanProgress } from './recognizer'
+import { recognizeSudoku, type SudokuReviewCell, type SudokuScanProgress } from './recognizer'
 import { emptyGrid, hasConflicts, solveSudoku, type SudokuGrid } from './solver'
 
 const clone = (grid: SudokuGrid) => grid.map((row) => [...row])
@@ -15,8 +15,11 @@ function givenSet(grid: SudokuGrid) {
 
 type ScanMeta = {
   detectedCells: number
+  candidateCells: number
   confidence: number
   warnings: string[]
+  boardMethod: 'perspective' | 'grid-lines'
+  reviewCells: SudokuReviewCell[]
 } | null
 
 export default function SudokuPuzzle() {
@@ -82,8 +85,11 @@ export default function SudokuPuzzle() {
       setGivens(recognizedGivens)
       setScanMeta({
         detectedCells: result.detectedCells,
+        candidateCells: result.candidateCells,
         confidence: result.confidence,
         warnings: result.warnings,
+        boardMethod: result.boardMethod,
+        reviewCells: result.reviewCells,
       })
 
       if (result.detectedCells === 0) {
@@ -165,7 +171,8 @@ export default function SudokuPuzzle() {
   }
 
   const validationLabel = conflicts ? 'Needs review' : recognizedCount ? 'Valid' : 'Waiting'
-  const issueCount = (conflicts ? 1 : 0) + (scanMeta?.warnings.length || 0)
+  const reviewKeys = useMemo(() => new Set((scanMeta?.reviewCells || []).map((cell) => `${cell.row}-${cell.col}`)), [scanMeta])
+  const issueCount = (conflicts ? 1 : 0) + (scanMeta?.reviewCells.length || 0)
 
   return (
     <PuzzleShell
@@ -218,6 +225,7 @@ export default function SudokuPuzzle() {
                 {grid.map((row, r) => row.map((value, c) => {
                   const key = `${r}-${c}`
                   const isGiven = givens.has(key)
+                  const needsOcrReview = reviewKeys.has(key)
                   return (
                     <input
                       key={key}
@@ -226,7 +234,7 @@ export default function SudokuPuzzle() {
                       value={value || ''}
                       disabled={scanning || (solved && !isGiven)}
                       onChange={(event) => change(r, c, event.target.value)}
-                      className={`${isGiven ? 'given' : ''} ${solved && !isGiven && value ? 'solution' : ''}`}
+                      className={`${isGiven ? 'given' : ''} ${needsOcrReview ? 'ocr-review' : ''} ${solved && !isGiven && value ? 'solution' : ''}`}
                     />
                   )
                 }))}
@@ -268,8 +276,10 @@ export default function SudokuPuzzle() {
 
             <section className="rw-inspector-section">
               <div className="rw-inspector-title"><strong>Recognition</strong><span>{scanning ? 'Processing' : 'Local'}</span></div>
-              <div className="rw-detail-row"><span>Recognized cells</span><strong>{scanMeta ? `${scanMeta.detectedCells} / 81` : '—'}</strong></div>
+              <div className="rw-detail-row"><span>Likely digit cells</span><strong>{scanMeta ? scanMeta.candidateCells : '—'}</strong></div>
+              <div className="rw-detail-row"><span>Recognized cells</span><strong>{scanMeta ? `${scanMeta.detectedCells} / ${scanMeta.candidateCells}` : '—'}</strong></div>
               <div className="rw-detail-row"><span>Confidence</span><strong>{scanMeta ? `${Math.round(scanMeta.confidence)}%` : '—'}</strong></div>
+              <div className="rw-detail-row"><span>Board detection</span><strong>{scanMeta ? (scanMeta.boardMethod === 'perspective' ? 'Perspective' : 'Grid lines') : '—'}</strong></div>
               <div className="rw-detail-row"><span>Validation</span><strong className={conflicts ? 'danger' : recognizedCount ? 'ok' : ''}>{validationLabel}</strong></div>
               <div className="rw-detail-row"><span>Issues</span><strong>{scanMeta || conflicts ? issueCount : '—'}</strong></div>
             </section>
@@ -277,13 +287,15 @@ export default function SudokuPuzzle() {
             <section className="rw-inspector-section">
               <div className="rw-inspector-title"><strong>Review</strong><span>{issueCount ? `${issueCount} issue${issueCount === 1 ? '' : 's'}` : 'Clear'}</span></div>
               {conflicts && <div className="rw-issue-row danger"><i /><div><strong>Conflicting values</strong><small>Correct the board before solving.</small></div></div>}
-              {scanMeta?.warnings.map((warning) => <div className="rw-issue-row" key={warning}><i /><div><strong>OCR warning</strong><small>{warning}</small></div></div>)}
+              {scanMeta?.reviewCells.slice(0, 6).map((cell) => <div className="rw-issue-row" key={`${cell.row}-${cell.col}-${cell.reason}`}><i /><div><strong>R{cell.row + 1}C{cell.col + 1} needs review</strong><small>{cell.reason.replaceAll('-', ' ')}{cell.confidence ? ` · OCR ${Math.round(cell.confidence)}%` : ''}</small></div></div>)}
+              {(scanMeta?.reviewCells.length || 0) > 6 && <p className="rw-inspector-note">+{(scanMeta?.reviewCells.length || 0) - 6} more highlighted cells on the board.</p>}
+              {scanMeta?.warnings.map((warning) => <div className="rw-issue-row" key={warning}><i /><div><strong>OCR note</strong><small>{warning}</small></div></div>)}
               {!conflicts && !scanMeta?.warnings.length && <p className="rw-inspector-note">{recognizedCount ? 'No validation issues detected.' : 'OCR warnings and validation issues will appear here.'}</p>}
             </section>
 
             <section className="rw-inspector-section rw-tip-section">
               <strong>Capture tip</strong>
-              <p>Keep the entire grid visible, well-lit and as straight as possible. Always review OCR before solving.</p>
+              <p>The scanner now detects the board contour, corrects perspective, isolates the digit component in each cell, and uses Sudoku rules to clear suspicious OCR. Yellow cells still need a visual check.</p>
             </section>
           </aside>
         </div>

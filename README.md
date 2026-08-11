@@ -1,31 +1,61 @@
-# PuzzleCam — Rework-style all-pages UI + clipboard image input
+# PuzzleCam — Rework UI + clipboard + Sudoku vision v5
 
-This package is an **overlay for the existing `tuongphantrue/puzzlecam` repository**.
+This is a **drop-in overlay** for the existing `tuongphantrue/puzzlecam` repository. Copy the package contents over the repository while preserving folders.
 
-## What it changes
+## Main change in this version: Sudoku image parsing
 
-- Replaces the old dark marketing-style home screen with a light, dense Rework-style app workspace.
-- Uses one consistent shell across Dashboard/My puzzles, Sudoku, Word Search, Tic-Tac-Toe and planned solvers.
-- Keeps Sudoku **solver-only**: photo/upload/paste → OCR → review recognized digits → solve.
-- Adds **Paste from clipboard** as a first-class image source. Users can click the paste area or simply press `Ctrl+V` / `Cmd+V` while the solver is open.
-- The shared `CameraPanel` also supports clipboard images, so image-enabled puzzle modules can reuse the same behavior.
-- Replaces the old colorful camera favicon/app icon with a compact monochrome **camera + puzzle-grid** mark that matches the new UI.
-- Uses that same mark in the PuzzleCam sidebar brand so the browser icon and in-app identity are consistent.
+The previous scanner used an axis-aligned square estimate, split that square into 81 equal regions, applied one threshold per region, and sent the whole cropped region to Tesseract. That is fragile: a small crop error or perspective skew shifts every cell, and leftover grid lines/noise can be interpreted as digits.
+
+The v5 scanner uses a staged vision pipeline instead:
+
+1. **Board contour detection** — loads OpenCV.js lazily and searches the thresholded image for large quadrilateral Sudoku-grid candidates.
+2. **Perspective correction** — the best quadrilateral is warped to a true 900×900 square before cells are split.
+3. **Grid verification** — candidate quadrilaterals are scored by whether strong lines appear at the expected 10 grid-line positions.
+4. **Digit-component isolation** — each cell is cropped inside its borders, thresholded, and reduced to the strongest centered digit-shaped connected contour. Border/grid remnants are rejected.
+5. **OCR normalization** — the digit is aspect-preserved, centered on a white 180×180 canvas, and given a reasonable border before Tesseract `PSM.SINGLE_CHAR` OCR.
+6. **Second-pass OCR** — low-confidence cells are retried with a lightly thickened digit image.
+7. **Sudoku-aware cleanup** — direct row/column/box OCR conflicts are cleared at the lowest-confidence cell. If the OCR state is still impossible, a small number of low-confidence givens are tested and cleared for review rather than forcing an invalid board.
+8. **Visible review cells** — uncertain/cleared cells are highlighted in yellow and listed in the right inspector.
+9. **Fallback remains** — if OpenCV cannot load or no credible board quadrilateral is found, PuzzleCam falls back to a stronger regular-grid projection detector rather than failing completely.
+
+The image is still processed in the browser. OpenCV.js is downloaded from the official OpenCV 4.10 documentation build on first use; the Sudoku image itself is not sent to OpenCV or a server.
+
+## Recognition diagnostics added to the UI
+
+The inspector now shows:
+
+- Likely digit cells
+- Recognized cells / likely cells
+- Average OCR confidence
+- Board detection method (`Perspective` or `Grid lines`)
+- Highlighted cells that need manual review
+
+These diagnostics make it much easier to distinguish a **board detection problem** from a **digit OCR problem**.
+
+## Existing UI features kept
+
+- Rework-style light, dense application shell on all pages
+- Desktop collapsible sidebar with remembered state
+- Mobile sidebar behavior
+- Monochrome PuzzleCam favicon and PWA icons
+- Sudoku is solver-only: **photo / upload / paste → OCR → review → solve**
+- Clipboard image input using the command bar or `Ctrl+V` / `Cmd+V`
 
 ## Files to replace/add
 
-Copy the contents of this package over the repository, preserving folders.
+### Sudoku vision + UI
+- `src/puzzles/sudoku/recognizer.ts` **(new replacement in this package)**
+- `src/puzzles/sudoku/SudokuPuzzle.tsx`
+- `src/css/sudoku.css`
 
-### UI
+### Shared UI
 - `src/App.tsx`
 - `src/components/PuzzleShell.tsx`
 - `src/components/CameraPanel.tsx`
-- `src/puzzles/sudoku/SudokuPuzzle.tsx`
 - `src/styles.css`
 - `src/css/rework.css`
-- `src/css/sudoku.css`
 
-### Favicon / PWA icon assets
+### Favicon / PWA assets
 - `public/favicon.svg`
 - `public/favicon.ico`
 - `public/favicon-16x16.png`
@@ -36,41 +66,10 @@ Copy the contents of this package over the repository, preserving folders.
 - `public/pwa-512x512.png`
 - `public/maskable-512x512.png`
 
-The common Vite/VitePWA filenames are included so existing favicon/PWA references can be replaced without changing solver code.
+## No new npm package required
 
-## If your `index.html` explicitly names an older favicon
+The app keeps the repository's existing Tesseract.js dependency. OpenCV.js is loaded lazily by `recognizer.ts`, so you do not need to change `package.json` for this update.
 
-Point its favicon links at the new public asset, preferably:
+## Deployment
 
-```html
-<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
-<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-```
-
-For GitHub Pages, keeping these references relative avoids pointing at the domain root instead of `/puzzlecam/`.
-
-## Deploy / cache
-
-After copying the files, commit and push to `main`. The repository's GitHub Pages workflow can rebuild the app.
-
-Favicons and PWA icons are aggressively cached by browsers and service workers. After deployment, if the old icon remains, use a hard refresh and clear the PuzzleCam site/PWA cache once.
-
-## Sidebar collapse update
-
-The Rework-style navigation can now be collapsed on desktop using the small chevron on the sidebar edge.
-
-- Expanded width: 216 px
-- Collapsed width: 58 px, icon-only navigation
-- The collapsed preference is saved in `localStorage`
-- Navigation items expose titles/tooltips in collapsed mode
-- On screens 760 px and below, the sidebar uses the existing full-width mobile drawer instead of the desktop collapsed state
-
-
-## Clipboard image input
-
-Sudoku now exposes three image sources in the command bar: **Take photo**, **Upload image**, and **Paste image**.
-
-The right-side Source image inspector also contains a compact paste target. Copy a screenshot or image, focus the paste area, then press `Ctrl+V` on Windows/Linux or `Cmd+V` on macOS. The pasted image goes through the same local OCR flow as an uploaded file.
-
-When supported by the browser, clicking **Paste image** also attempts direct clipboard-image access. If the browser blocks that permission, the UI falls back to the standard keyboard paste event instead.
+Copy the files over your repository, commit, and push to `main`. Let the existing GitHub Pages action rebuild the app. Because PuzzleCam is a PWA, use a hard refresh or clear the site's service-worker cache once if an older scanner bundle remains after deployment.

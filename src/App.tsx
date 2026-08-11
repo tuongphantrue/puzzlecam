@@ -68,7 +68,7 @@ function Icon({ name }: { name: string }) {
 
 function SolverRow({ item, navigate }: { item: NavItem; navigate: (id: PageId) => void }) {
   const details: Record<string, { input: string; engine: string }> = {
-    sudoku: { input: 'Photo / image', engine: 'OCR + solver' },
+    sudoku: { input: 'Photo / upload / paste', engine: 'OCR + solver' },
     wordsearch: { input: 'Grid / words', engine: '8-direction finder' },
     tictactoe: { input: 'Board state', engine: 'Minimax' },
   }
@@ -120,10 +120,10 @@ function Dashboard({ navigate }: { navigate: (id: PageId) => void }) {
           <div className="pc-inspector-heading">Workspace</div>
           <div className="pc-inspector-row"><span>Processing</span><strong>On device</strong></div>
           <div className="pc-inspector-row"><span>Ready solvers</span><strong>3</strong></div>
-          <div className="pc-inspector-row"><span>Camera input</span><strong>Available</strong></div>
+          <div className="pc-inspector-row"><span>Image input</span><strong>Camera · Upload · Paste</strong></div>
           <div className="pc-inspector-section">
             <strong>Start here</strong>
-            <p>Choose a solver from the table. Sudoku accepts a photo or uploaded image and lets you review OCR before solving.</p>
+            <p>Choose a solver from the table. Sudoku accepts a photo, uploaded image, or clipboard screenshot and lets you review OCR before solving.</p>
           </div>
           <div className="pc-inspector-section">
             <strong>More solvers</strong>

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import PuzzleShell from '../../components/PuzzleShell'
 import { recognizeSudoku, type SudokuScanProgress } from './recognizer'
 import { emptyGrid, hasConflicts, solveSudoku, type SudokuGrid } from './solver'
@@ -22,7 +22,7 @@ type ScanMeta = {
 export default function SudokuPuzzle() {
   const [grid, setGrid] = useState<SudokuGrid>(() => emptyGrid())
   const [givens, setGivens] = useState<Set<string>>(() => new Set())
-  const [message, setMessage] = useState('Upload or photograph a Sudoku puzzle to begin.')
+  const [message, setMessage] = useState('Upload, photograph, or paste a Sudoku puzzle to begin.')
   const [scanning, setScanning] = useState(false)
   const [progress, setProgress] = useState<SudokuScanProgress | null>(null)
   const [scanMeta, setScanMeta] = useState<ScanMeta>(null)
@@ -30,6 +30,7 @@ export default function SudokuPuzzle() {
   const [solved, setSolved] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+  const pasteZoneRef = useRef<HTMLDivElement>(null)
 
   const conflicts = useMemo(() => hasConflicts(grid), [grid])
   const recognizedCount = givens.size
@@ -54,7 +55,7 @@ export default function SudokuPuzzle() {
 
   const solve = () => {
     if (!recognizedCount) {
-      setMessage('Upload or photograph a Sudoku before solving.')
+      setMessage('Upload, photograph, or paste a Sudoku before solving.')
       return
     }
     const result = solveSudoku(grid)
@@ -103,12 +104,56 @@ export default function SudokuPuzzle() {
     }
   }
 
-  const loadFile = (file?: File) => {
+  const loadFile = useCallback((file?: File) => {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => void scanImage(String(reader.result))
     reader.readAsDataURL(file)
+  }, [])
+
+  const pasteFileFromEvent = useCallback((event: ClipboardEvent) => {
+    const item = Array.from(event.clipboardData?.items || []).find((entry) => entry.type.startsWith('image/'))
+    const file = item?.getAsFile()
+    if (!file) return false
+    event.preventDefault()
+    setMessage('Clipboard image received. Running OCR…')
+    loadFile(file)
+    return true
+  }, [loadFile])
+
+  const pasteFromClipboard = async () => {
+    const clipboard = navigator.clipboard as Clipboard & { read?: () => Promise<Array<{ types: readonly string[]; getType: (type: string) => Promise<Blob> }>> }
+    if (!clipboard?.read) {
+      pasteZoneRef.current?.focus()
+      setMessage('Paste area ready. Press Ctrl+V (or Cmd+V) to paste your Sudoku image.')
+      return
+    }
+
+    try {
+      const items = await clipboard.read()
+      for (const item of items) {
+        const imageType = item.types.find((type) => type.startsWith('image/'))
+        if (!imageType) continue
+        const blob = await item.getType(imageType)
+        setMessage('Clipboard image received. Running OCR…')
+        loadFile(new File([blob], 'clipboard-sudoku', { type: imageType }))
+        return
+      }
+      pasteZoneRef.current?.focus()
+      setMessage('No image found in the clipboard. Copy a screenshot or image, then press Ctrl+V.')
+    } catch {
+      pasteZoneRef.current?.focus()
+      setMessage('Browser clipboard access was blocked. Click the paste area and press Ctrl+V instead.')
+    }
   }
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      pasteFileFromEvent(event)
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  }, [pasteFileFromEvent])
 
   const clear = () => {
     setGrid(emptyGrid())
@@ -116,7 +161,7 @@ export default function SudokuPuzzle() {
     setScanMeta(null)
     setImage(null)
     setSolved(false)
-    setMessage('Upload or photograph a Sudoku puzzle to begin.')
+    setMessage('Upload, photograph, or paste a Sudoku puzzle to begin.')
   }
 
   const validationLabel = conflicts ? 'Needs review' : recognizedCount ? 'Valid' : 'Waiting'
@@ -126,7 +171,7 @@ export default function SudokuPuzzle() {
     <PuzzleShell
       icon="▦"
       title="Sudoku"
-      subtitle="Scan or upload a Sudoku, review OCR, then solve."
+      subtitle="Scan, upload, or paste a Sudoku, review OCR, then solve."
     >
       <div className="rw-sudoku-page">
         <div className="rw-commandbar">
@@ -138,6 +183,7 @@ export default function SudokuPuzzle() {
           <div className="rw-command-actions">
             <button className="rw-button secondary" onClick={() => photoInputRef.current?.click()} disabled={scanning}>⌑ Take photo</button>
             <button className="rw-button secondary" onClick={() => uploadInputRef.current?.click()} disabled={scanning}>⇧ Upload image</button>
+            <button className="rw-button secondary" onClick={() => void pasteFromClipboard()} disabled={scanning}>⌘ Paste image</button>
             <input ref={photoInputRef} className="rw-hidden-input" type="file" accept="image/*" capture="environment" onChange={(event) => loadFile(event.target.files?.[0])} />
             <input ref={uploadInputRef} className="rw-hidden-input" type="file" accept="image/*" onChange={(event) => loadFile(event.target.files?.[0])} />
           </div>
@@ -204,7 +250,19 @@ export default function SudokuPuzzle() {
             <section className="rw-inspector-section">
               <div className="rw-inspector-title"><strong>Source image</strong><span>{image ? 'Loaded' : 'No image'}</span></div>
               <div className={`rw-image-stage ${image ? 'has-image' : ''}`}>
-                {image ? <img src={image} alt="Captured Sudoku" /> : <div className="rw-empty-state"><span>▧</span><strong>No image selected</strong><small>Use Take photo or Upload image above.</small></div>}
+                {image ? <img src={image} alt="Captured Sudoku" /> : <div className="rw-empty-state"><span>▧</span><strong>No image selected</strong><small>Take a photo, upload an image, or paste one from your clipboard.</small></div>}
+              </div>
+              <div
+                ref={pasteZoneRef}
+                className="rw-paste-zone"
+                tabIndex={0}
+                    role="button"
+                aria-label="Paste Sudoku image from clipboard"
+                onClick={() => pasteZoneRef.current?.focus()}
+              >
+                <span className="rw-paste-icon">⌘</span>
+                <div><strong>{image ? 'Paste another image' : 'Paste from clipboard'}</strong><small>Click here, then press Ctrl+V or Cmd+V</small></div>
+                <kbd>Ctrl / Cmd + V</kbd>
               </div>
             </section>
 

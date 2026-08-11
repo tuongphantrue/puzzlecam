@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-type InputMode = 'camera' | 'upload'
+type InputMode = 'camera' | 'upload' | 'paste'
 
 interface Props {
   title?: string
@@ -16,6 +16,7 @@ export default function CameraPanel({ title = 'Image input', onCapture }: Props)
   const videoRef = useRef<HTMLVideoElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const pasteZoneRef = useRef<HTMLDivElement>(null)
   const mobile = useMemo(() => isProbablyMobile(), [])
   const supportsCamera = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia)
   const [mode, setMode] = useState<InputMode>(supportsCamera && mobile ? 'camera' : 'upload')
@@ -65,7 +66,7 @@ export default function CameraPanel({ title = 'Image input', onCapture }: Props)
     stop()
   }
 
-  const upload = (file?: File) => {
+  const upload = useCallback((file?: File) => {
     if (!file) return
     setError(null)
     stop()
@@ -76,6 +77,44 @@ export default function CameraPanel({ title = 'Image input', onCapture }: Props)
       onCapture?.(data)
     }
     reader.readAsDataURL(file)
+  }, [onCapture])
+
+  const pasteFileFromEvent = useCallback((event: ClipboardEvent) => {
+    const item = Array.from(event.clipboardData?.items || []).find((entry) => entry.type.startsWith('image/'))
+    const file = item?.getAsFile()
+    if (!file) return false
+    event.preventDefault()
+    setMode('paste')
+    upload(file)
+    return true
+  }, [upload])
+
+  const pasteFromClipboard = async () => {
+    setMode('paste')
+    setError(null)
+
+    const clipboard = navigator.clipboard as Clipboard & { read?: () => Promise<Array<{ types: readonly string[]; getType: (type: string) => Promise<Blob> }>> }
+    if (!clipboard?.read) {
+      pasteZoneRef.current?.focus()
+      setError('Press Ctrl+V (or Cmd+V) to paste an image from your clipboard.')
+      return
+    }
+
+    try {
+      const items = await clipboard.read()
+      for (const item of items) {
+        const imageType = item.types.find((type) => type.startsWith('image/'))
+        if (!imageType) continue
+        const blob = await item.getType(imageType)
+        upload(new File([blob], 'clipboard-image', { type: imageType }))
+        return
+      }
+      pasteZoneRef.current?.focus()
+      setError('Clipboard does not contain an image. Copy a screenshot or image, then press Ctrl+V.')
+    } catch {
+      pasteZoneRef.current?.focus()
+      setError('Clipboard access was blocked. Press Ctrl+V (or Cmd+V) in the paste area instead.')
+    }
   }
 
   const switchMode = (nextMode: InputMode) => {
@@ -84,7 +123,16 @@ export default function CameraPanel({ title = 'Image input', onCapture }: Props)
     stop()
   }
 
-  useEffect(() => () => stop(), [])
+  useEffect(() => {
+    const handleDocumentPaste = (event: ClipboardEvent) => {
+      pasteFileFromEvent(event)
+    }
+    document.addEventListener('paste', handleDocumentPaste)
+    return () => {
+      document.removeEventListener('paste', handleDocumentPaste)
+      stop()
+    }
+  }, [pasteFileFromEvent])
 
   return (
     <section className="camera-card panel pc-camera-panel">
@@ -114,6 +162,14 @@ export default function CameraPanel({ title = 'Image input', onCapture }: Props)
         >
           Upload image
         </button>
+        <button
+          type="button"
+          className={`toggle-chip ${mode === 'paste' ? 'active' : ''}`}
+          onClick={() => switchMode('paste')}
+          aria-pressed={mode === 'paste'}
+        >
+          Paste image
+        </button>
       </div>
 
       <div className="camera-stage">
@@ -123,10 +179,15 @@ export default function CameraPanel({ title = 'Image input', onCapture }: Props)
           <video ref={videoRef} playsInline muted className={active ? '' : 'is-hidden'} />
         )}
         {!active && !image && (
-          <div className="camera-empty">
-            <span className="pc-camera-glyph">▧</span>
-            <strong>{mode === 'camera' ? 'Camera is off' : 'No image selected'}</strong>
-            <small>{mode === 'camera' ? 'Open your rear camera and keep the puzzle inside the frame.' : 'Choose a clear picture of the puzzle from this device.'}</small>
+          <div
+            ref={pasteZoneRef}
+            className={`camera-empty ${mode === 'paste' ? 'pc-paste-zone' : ''}`}
+            tabIndex={mode === 'paste' ? 0 : -1}
+          >
+            <span className="pc-camera-glyph">{mode === 'paste' ? '⌘' : '▧'}</span>
+            <strong>{mode === 'camera' ? 'Camera is off' : mode === 'paste' ? 'Paste an image here' : 'No image selected'}</strong>
+            <small>{mode === 'camera' ? 'Open your rear camera and keep the puzzle inside the frame.' : mode === 'paste' ? 'Copy a screenshot or puzzle image, click this area, then press Ctrl+V or Cmd+V.' : 'Choose a clear picture of the puzzle from this device.'}</small>
+            {mode === 'paste' && <kbd>Ctrl / Cmd + V</kbd>}
           </div>
         )}
         {(active || image) && <div className="scan-guide" aria-hidden="true" />}
@@ -142,8 +203,10 @@ export default function CameraPanel({ title = 'Image input', onCapture }: Props)
                 <button className="primary-button" onClick={capture}>Capture</button>
                 <button className="secondary-button" onClick={stop}>Stop</button>
               </>
-        ) : (
+        ) : mode === 'upload' ? (
           <button className="primary-button" onClick={() => fileInputRef.current?.click()}>Choose image</button>
+        ) : (
+          <button className="primary-button" onClick={() => void pasteFromClipboard()}>Paste image</button>
         )}
         {image && !active && <button className="secondary-button" onClick={() => setImage(null)}>Clear</button>}
       </div>
@@ -157,7 +220,7 @@ export default function CameraPanel({ title = 'Image input', onCapture }: Props)
       />
 
       <p className="muted small pc-camera-note">
-        {mobile ? 'Use the live camera or choose an image from your gallery.' : 'Upload a picture, or use a webcam when available.'}
+        {mobile ? 'Use the camera, gallery, or paste a copied image.' : 'Upload, use a webcam, or paste a screenshot with Ctrl+V / Cmd+V.'}
       </p>
     </section>
   )

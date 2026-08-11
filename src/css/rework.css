@@ -149,6 +149,10 @@ label { color: #55554f; font-size: 9.5px; }
 .pc-file-input { display: none; }
 .pc-camera-note { margin: 8px 0 0; }
 
+.pc-paste-zone { width: min(100%, 320px); min-height: 150px; border: 1px dashed #bdbdb6; border-radius: 4px; background: #fafaf8; outline: none; cursor: text; }
+.pc-paste-zone:focus { border-color: #777770; box-shadow: inset 0 0 0 1px #777770; background: #fff; }
+.pc-paste-zone kbd { margin-top: 10px; padding: 3px 6px; border: 1px solid #d4d4ce; border-bottom-color: #bdbdb6; border-radius: 3px; background: #fff; color: #666660; font: 650 8.5px/1.2 Inter, ui-sans-serif, sans-serif; }
+
 .tic-tac-toe-grid, .tictactoe-grid, .ttt-grid, .tic-grid, .game-grid { display: grid; grid-template-columns: repeat(3,minmax(64px,1fr)); width: min(100%,420px); aspect-ratio: 1; gap: 1px; padding: 1px; border: 1px solid #3f3f3b; background: #3f3f3b; }
 .tic-tac-toe-grid button, .tictactoe-grid button, .ttt-grid button, .tic-grid button, .game-grid button { border: 0; border-radius: 0; background: #fff; color: #22221f; font-size: clamp(25px,5vw,50px); font-weight: 650; cursor: pointer; }
 .tic-tac-toe-grid button:hover, .tictactoe-grid button:hover, .ttt-grid button:hover, .tic-grid button:hover, .game-grid button:hover { background: #f4f4f1; }
